@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Deep Space War/Deep Space War.vcxproj" Id="ef035b2f-08cd-4833-8e0d-0c6209a7501f" />
+</Solution>
