@@ -141,6 +141,7 @@ dll::BACKGROUND Field(background::field);
 
 dll::CREATURES* Hero{ nullptr };
 
+std::vector<dll::CREATURES*> vHeroShots{ nullptr };
 
 
 
@@ -250,6 +251,9 @@ void InitGame()
 
 	FreeMem(&Hero);
 	Hero = dll::CREATURES::create(creatures::hero, 100.0f, RandIt(60.0f, ground - 100.0f));
+
+	for (int i = 0; i < vHeroShots.size(); ++i)FreeMem(&vHeroShots[i]);
+	vHeroShots.clear();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -482,11 +486,29 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 				Hero->set_path(targ_x, targ_y);
 				Hero->angle = Hero->rotate_angle(abs(Hero->center.x - targ_x), abs(Hero->center.y - targ_y));
-			
+				Hero->hero_moving = true;
+				if (sound)mciSendString(L"play .\\res\\snd\\engine.wav", NULL, NULL, NULL);
 			}
 		}
-
 		break;
+
+	case WM_RBUTTONDOWN:
+		if (!Hero)break;
+		else
+		{
+			float targ_x = (float)(cur_pos.x * scale_x);
+			float targ_y = (float)(cur_pos.y * scale_y);
+
+			Hero->set_path(targ_x, targ_y);
+			Hero->angle = Hero->rotate_angle(abs(Hero->center.x - targ_x), abs(Hero->center.y - targ_y));
+
+			vHeroShots.push_back(dll::CREATURES::create(creatures::shot, Hero->center.x, Hero->center.y));
+			vHeroShots.back()->angle = Hero->angle;
+			vHeroShots.back()->set_path(targ_x, targ_y);
+			if (sound)mciSendString(L"play .\\res\\snd\\laser.wav", NULL, NULL, NULL);
+		}
+		break;
+
 
 
 	default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
@@ -866,9 +888,25 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+	// ACTION //////////////////////////////////////////////////////////////////
 
-
-
+		if (Hero)
+		{
+			if (Hero->hero_moving)Hero->move(level);
+			
+		}
+		if (!vHeroShots.empty())
+		{
+			for (std::vector<dll::CREATURES*>::iterator shot = vHeroShots.begin(); shot < vHeroShots.end(); ++shot)
+			{
+				if (!(*shot)->shot_move(level))
+				{
+					(*shot)->Release();
+					vHeroShots.erase(shot);
+					break;
+				}
+			}
+		}
 
 
 
@@ -905,6 +943,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, Hero->center));
 		}
 
+		if (!vHeroShots.empty())
+		{
+			for (std::vector<dll::CREATURES*>::iterator shot = vHeroShots.begin(); shot < vHeroShots.end(); ++shot)
+			{
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation((*shot)->angle, (*shot)->center));
+				Draw->DrawBitmap(bmpShot[(*shot)->get_frame()], (*shot)->my_rect);
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, (*shot)->center));
+			}
+		}
 		
 	////////////////////////////////////////////////////////////////////////////////
 		

@@ -499,6 +499,8 @@ namespace dll
 		
 		dirs dir{ dirs::stop };
 
+		bool hero_moving{ false };
+
 		int lifes = 0;
 		int strenght{ 0 };
 		int armor{ 0 };
