@@ -61,9 +61,9 @@ D2D1_RECT_F b1Rect{ 50.0f, 10.0f, scr_width / 3.0f - 50.0f, 40.0f };
 D2D1_RECT_F b2Rect{ scr_width / 3.0f, 10.0f, scr_width * 2.0f / 3.0f - 50.0f, 40.0f };
 D2D1_RECT_F b3Rect{ scr_width * 2.0f / 3.0f, 10.0f, scr_width - 50.0f, 40.0f };
 
-D2D1_RECT_F b1TxtRect{ 80.0f, 15.0f, scr_width / 3.0f - 50.0f, 40.0f };
-D2D1_RECT_F b2TxtRect{ scr_width / 3.0f + 30.0f, 15.0f, scr_width * 2.0f / 3.0f - 50.0f, 40.0f };
-D2D1_RECT_F b3TxtRect{ scr_width * 2.0f / 3.0f + 30.0f, 15.0f, scr_width - 50.0f, 40.0f };
+D2D1_RECT_F b1TxtRect{ 90.0f, 12.0f, scr_width / 3.0f - 50.0f, 40.0f };
+D2D1_RECT_F b2TxtRect{ scr_width / 3.0f + 45.0f, 12.0f, scr_width * 2.0f / 3.0f - 50.0f, 40.0f };
+D2D1_RECT_F b3TxtRect{ scr_width * 2.0f / 3.0f + 55.0f, 12.0f, scr_width - 50.0f, 40.0f };
 
 bool pause{ false };
 bool sound{ true };
@@ -134,8 +134,12 @@ ID2D1Bitmap* bmpShot[12]{ nullptr };
 
 ////////////////////////////////////////////////////////
 
+dll::RANDIT RandIt{};
+
 dll::BACKGROUND Intro(background::intro);
 dll::BACKGROUND Field(background::field);
+
+dll::CREATURES* Hero{ nullptr };
 
 
 
@@ -237,14 +241,15 @@ void InitGame()
 	wcscpy_s(current_player, L"TARLYO");
 	name_set = false;
 
-	
-
 	level = 1.0f;
 	score = 0;
 	mins = 0;
 	secs = 0;
 
 	level_skipped = false;
+
+	FreeMem(&Hero);
+	Hero = dll::CREATURES::create(creatures::hero, 100.0f, RandIt(60.0f, ground - 100.0f));
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -462,6 +467,27 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		}
 		break;
 
+	case WM_LBUTTONDOWN:
+		if (HIWORD(lParam) <= 50)
+		{
+
+		}
+		else
+		{
+			if (!Hero) break;
+			else
+			{
+				float targ_x = (float)(cur_pos.x * scale_x);
+				float targ_y = (float)(cur_pos.y * scale_y);
+
+				Hero->set_path(targ_x, targ_y);
+				Hero->angle = Hero->rotate_angle(abs(Hero->center.x - targ_x), abs(Hero->center.y - targ_y));
+			
+			}
+		}
+
+		break;
+
 
 	default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
 	}
@@ -509,6 +535,8 @@ void CreateResources()
 	if (!bHwnd)ErrExit(eWindow);
 	else
 	{
+		ShowWindow(bHwnd, SW_SHOWDEFAULT);
+
 		HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &iFactory);
 		if (hr != S_OK)
 		{
@@ -813,12 +841,76 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	CreateResources();
 
+	while (bMsg.message != WM_QUIT)
+	{
+		if ((bRet = PeekMessage(&bMsg, NULL, NULL, NULL, PM_REMOVE)) != 0)
+		{
+			if (bRet == -1)ErrExit(eMsg);
+
+			TranslateMessage(&bMsg);
+			DispatchMessage(&bMsg);
+		}
+
+		if (pause)
+		{
+			if (show_help)continue;
+
+			if (bigText && txtBrush)
+			{
+				Draw->BeginDraw();
+				Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
+				Draw->DrawTextW(L"ПАУЗА", 6, bigText, D2D1::RectF(scr_width / 2.0f - 100.0f, scr_height / 2.0f - 50.0f,
+					scr_width, scr_height), txtBrush);
+				Draw->EndDraw();
+				continue;
+			}
+		}
 
 
 
 
 
 
+
+	// DRAW THINGS *****************************************************************
+
+		Draw->BeginDraw();
+		if (statBrush && inactBrush && txtBrush && hgltBrush && nrmText && b1BckgBrush && b2BckgBrush && b3BckgBrush)
+		{
+			Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), statBrush);
+			Draw->FillRoundedRectangle(D2D1::RoundedRect(b1Rect, 25.0f, 30.0f), b1BckgBrush);
+			Draw->FillRoundedRectangle(D2D1::RoundedRect(b2Rect, 25.0f, 30.0f), b2BckgBrush);
+			Draw->FillRoundedRectangle(D2D1::RoundedRect(b3Rect, 25.0f, 30.0f), b3BckgBrush);
+
+			if (name_set)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmText, b1TxtRect, inactBrush);
+			else
+			{
+				if (!b1Hglt)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmText, b1TxtRect, txtBrush);
+				else Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmText, b1TxtRect, hgltBrush);
+			}
+			if (!b2Hglt)Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmText, b2TxtRect, txtBrush);
+			else Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmText, b2TxtRect, hgltBrush);
+			if (!b3Hglt)Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmText, b3TxtRect, txtBrush);
+			else Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmText, b3TxtRect, hgltBrush);
+		}
+
+		Draw->DrawBitmap(bmpSpace[Field.frame()], Field.my_rect);
+
+	// DRAW HERO ************************************
+
+		if (Hero)
+		{
+			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(Hero->angle, Hero->center));
+			Draw->DrawBitmap(bmpHero[Hero->get_frame()], Hero->my_rect);
+			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, Hero->center));
+		}
+
+		
+	////////////////////////////////////////////////////////////////////////////////
+		
+		Draw->EndDraw();
+	
+	}
 
 	std::remove(tmp_file);
 	ReleaseResources();
