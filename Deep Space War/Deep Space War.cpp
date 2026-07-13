@@ -134,6 +134,25 @@ ID2D1Bitmap* bmpShot[12]{ nullptr };
 
 ////////////////////////////////////////////////////////
 
+struct EXPLOSION
+{
+	D2D1_POINT_2F center{};
+
+	int frame = 0;
+	int max_frames = 23;
+	int frame_delay = 4;
+
+	int get_frame()
+	{
+		frame_delay--;
+		if (frame_delay <= 0)
+		{
+			frame_delay = 4;
+			++frame;
+		}
+	}
+};
+
 dll::RANDIT RandIt{};
 
 dll::BACKGROUND Intro(background::intro);
@@ -141,8 +160,15 @@ dll::BACKGROUND Field(background::field);
 
 dll::CREATURES* Hero{ nullptr };
 
-std::vector<dll::CREATURES*> vHeroShots{ nullptr };
+std::vector<EXPLOSION>vExplosions;
+std::vector<dll::FADING>vAssets;
 
+std::vector<dll::CREATURES*> vHeroShots{ nullptr };
+std::vector<dll::CREATURES*> vEvilShots{ nullptr };
+
+std::vector<dll::CREATURES*> vEvils{ nullptr };
+
+std::vector<dll::METEORS*> vMeteors{ nullptr };
 
 
 ///////////////////////////////////////////////////////
@@ -249,11 +275,27 @@ void InitGame()
 
 	level_skipped = false;
 
+	vExplosions.clear();
+	vAssets.clear();
+
 	FreeMem(&Hero);
 	Hero = dll::CREATURES::create(creatures::hero, 100.0f, RandIt(60.0f, ground - 100.0f));
 
-	for (int i = 0; i < vHeroShots.size(); ++i)FreeMem(&vHeroShots[i]);
+	if (!vHeroShots.empty())
+		for (int i = 0; i < vHeroShots.size(); ++i)FreeMem(&vHeroShots[i]);
 	vHeroShots.clear();
+
+	if (!vEvilShots.empty())
+		for (int i = 0; i < vEvilShots.size(); ++i)FreeMem(&vEvilShots[i]);
+	vEvilShots.clear();
+
+	if (!vEvils.empty())
+		for (int i = 0; i < vEvils.size(); ++i)FreeMem(&vEvils[i]);
+	vEvils.clear();
+
+	if (!vMeteors.empty())
+		for (int i = 0; i < vMeteors.size(); ++i)FreeMem(&vMeteors[i]);
+	vMeteors.clear();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -508,8 +550,6 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			if (sound)mciSendString(L"play .\\res\\snd\\laser.wav", NULL, NULL, NULL);
 		}
 		break;
-
-
 
 	default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
 	}
@@ -838,17 +878,16 @@ void CreateResources()
 
 	PlaySound(L".\\res\\snd\\intro.wav", NULL, SND_ASYNC);
 
-	for (int i = 0; i < 200; ++i)
+	for (int i = 0; i < 220; ++i)
 	{
 		Draw->BeginDraw();
 		Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
 		Draw->DrawBitmap(bmpLogo, D2D1::RectF(0, 0, scr_width, scr_height));
 		Draw->EndDraw();
 
-		if (i == 199)PlaySound(L".\\res\\snd\\boom.wav", NULL, SND_SYNC);
+		if (i == 219)PlaySound(L".\\res\\snd\\boom.wav", NULL, SND_SYNC);
 	}
 }
-
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
@@ -908,11 +947,131 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		if (vMeteors.size() < (int)(level)+3 && RandIt(0, 700) == 66)
+		{
+			float start_x{ RandIt(0.0f, 900.0f) };
+			float start_y{ sky - 100.0f };
+
+			float end_x{ 0 };
+			float end_y{ ground + 200.0f };
+
+			float opposite{ 0 };
+			float adjanced{ 0 };
+
+			if (start_x < scr_width / 2.0f)end_x = scr_width / 2.0f + RandIt(50.0f, scr_width);
+			else end_x = scr_width / 2.0f - RandIt(50.0f, 400.0f);
+
+			if (RandIt(0, 2) == 1)start_y = ground + 100.0f;
+
+			opposite = abs(start_x - end_x);
+			adjanced = abs(start_y - end_y);
+
+			vMeteors.push_back(dll::METEORS::create(static_cast<meteors>(RandIt(0, 2)), start_x, start_y, end_x, end_y,
+				opposite, adjanced));
+		}
+		if (!vMeteors.empty())
+		{
+			for (std::vector<dll::METEORS*>::iterator met = vMeteors.begin(); met < vMeteors.end(); ++met)
+			{
+				if (!(*met)->move(level))
+				{
+					(*met)->Release();
+					vMeteors.erase(met);
+					break;
+				}
+			}
+		}
+
+
+		if (vEvils.size() < 3 + (int)(level) && RandIt(0, 300) == 66)
+		{
+			float sx{ scr_width - 100.0f };
+			float sy{ RandIt(sky, ground - 100.0f) };
+
+			if (RandIt(0, 2) == 2)sx = 100.0f;
+	
+			vEvils.push_back(dll::CREATURES::create(static_cast<creatures>(RandIt(0, 3)), sx, sy));
+			if (vEvils.back()->center.x > scr_width / 2.0f)vEvils.back()->set_path(0, vEvils.back()->center.y);
+			else vEvils.back()->set_path(scr_width, vEvils.back()->center.y);
+			vEvils.back()->action = actions::patrol;
+		}
+
+		if (!vEvils.empty() && Hero)
+		{
+			dll::BAG<D2D1_POINT_2F>MeteorsBag(vMeteors.size());
+			dll::BAG<D2D1_POINT_2F>AssetsBag(vAssets.size());
+
+			if (!vMeteors.empty())
+				for (int i = 0; i < vMeteors.size(); ++i)MeteorsBag.push_back(vMeteors[i]->center);
+			if (!vAssets.empty())
+				for (int i = 0; i < vAssets.size(); ++i)AssetsBag.push_back(D2D1::Point2F(vAssets[i].rect.left + 11.0f,
+					vAssets[i].rect.top + 15.5f));
+
+			for (std::vector<dll::CREATURES*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+			{
+				if (!MeteorsBag.empty())dll::sort(MeteorsBag, (*evil)->center);
+				if (!AssetsBag.empty())dll::sort(AssetsBag, (*evil)->center);
+
+				dll::AIMove((*evil), AssetsBag, MeteorsBag, Hero->center);
+			}
+		}
+
+		if (!vEvils.empty())
+		{
+			for (int i = 0; i < vEvils.size(); ++i)
+			{
+				if (vEvils[i]->action == actions::patrol || vEvils[i]->action == actions::move)vEvils[i]->move(level);
+				else if (vEvils[i]->action == actions::attack)
+				{
+					int damage = vEvils[i]->attack();
+
+					if (damage > 0)
+					{
+						vEvilShots.push_back(dll::CREATURES::create(creatures::shot, vEvils[i]->center.x, vEvils[i]->center.y));
+						vEvilShots.back()->set_path(Hero->center.x, Hero->center.y);
+						vEvilShots.back()->angle = vEvils[i]->angle;
+					}
+				}
+			}
+		}
+
+
 
 
 	// DRAW THINGS *****************************************************************
 
 		Draw->BeginDraw();
+		
+		Draw->DrawBitmap(bmpSpace[Field.frame()], Field.my_rect);
+
+		// DRAW METEORS *********************************
+
+		if (!vMeteors.empty())
+		{
+			for (std::vector<dll::METEORS*>::iterator met = vMeteors.begin(); met < vMeteors.end(); ++met)
+			{
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation((*met)->angle, (*met)->center));
+				switch ((*met)->type)
+				{
+				case meteors::meteor1:
+					Draw->DrawBitmap(bmpMeteor1[(*met)->get_frame()], (*met)->my_rect);
+					break;
+
+				case meteors::meteor2:
+					Draw->DrawBitmap(bmpMeteor2[(*met)->get_frame()], (*met)->my_rect);
+					break;
+
+				case meteors::meteor3:
+					Draw->DrawBitmap(bmpMeteor3[(*met)->get_frame()], (*met)->my_rect);
+					break;
+				}
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, (*met)->center));
+			}
+		}
+
+		////////////////////////////////////////////////////////////////////////////////
+		
+		
 		if (statBrush && inactBrush && txtBrush && hgltBrush && nrmText && b1BckgBrush && b2BckgBrush && b3BckgBrush)
 		{
 			Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), statBrush);
@@ -932,9 +1091,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			else Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmText, b3TxtRect, hgltBrush);
 		}
 
-		Draw->DrawBitmap(bmpSpace[Field.frame()], Field.my_rect);
+		
 
-	// DRAW HERO ************************************
+		// DRAW HERO ************************************
 
 		if (Hero)
 		{
@@ -953,7 +1112,50 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 		
-	////////////////////////////////////////////////////////////////////////////////
+		// DRAW EVILS **********************************
+
+		if (!vEvils.empty())
+		{
+			for (std::vector<dll::CREATURES*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+			{
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation((*evil)->angle, (*evil)->center));
+			
+				switch ((*evil)->type)
+				{
+				case creatures::fighter:
+					Draw->DrawBitmap(bmpEvil1, (*evil)->my_rect);
+					break;
+
+				case creatures::cruiser:
+					Draw->DrawBitmap(bmpEvil2, (*evil)->my_rect);
+					break;
+
+				case creatures::shuttle:
+					Draw->DrawBitmap(bmpEvil3, (*evil)->my_rect);
+					break;
+
+				case creatures::ship:
+					Draw->DrawBitmap(bmpEvil4, (*evil)->my_rect);
+					break;
+				}
+
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, (*evil)->center));
+			}
+		}
+
+		if (!vEvilShots.empty())
+		{
+			for (std::vector<dll::CREATURES*>::iterator shot = vEvilShots.begin(); shot < vEvilShots.end(); ++shot)
+			{
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation((*shot)->angle, (*shot)->center));
+				Draw->DrawBitmap(bmpShot[(*shot)->get_frame()], (*shot)->my_rect);
+				Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, (*shot)->center));
+			}
+		}
+
+
+
+		////////////////////////////////////////////////////////////////////////////////
 		
 		Draw->EndDraw();
 	

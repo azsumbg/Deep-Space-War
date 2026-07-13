@@ -28,6 +28,7 @@ enum class actions { patrol = 0, move = 1, attack = 2 };
 enum class creatures { fighter = 0, cruiser = 1, shuttle = 2, ship = 3, hero = 4,shot = 5 };
 enum class background { intro = 0, field = 1 };
 enum class assets { armor = 0, life = 1, shot = 2 };
+enum class meteors { meteor1 = 0, meteor2 = 1, meteor3 = 2 };
 
 namespace dll
 {
@@ -40,6 +41,8 @@ namespace dll
 	public:
 		assets type{ assets::armor };
 		D2D1_RECT_F rect{};
+
+		bool gathered{ false };
 		
 		float get_opacity()
 		{
@@ -528,6 +531,45 @@ namespace dll
 		float rotate_angle(float oppos, float adjanced);
 	
 		static CREATURES* create(creatures what, float sx, float sy);
+	};
+
+	class SPACEFIGHT_API METEORS :public PROTON
+	{
+	private:
+		int frame{ 0 };
+		int max_frames{ 0 };
+		int frame_delay{ 0 };
+		int max_frame_delay{ 0 };
+
+		float speed = 0.5f;
+
+		float move_sx{ 0 };
+		float move_sy{ 0 };
+		float move_ex{ 0 };
+		float move_ey{ 0 };
+
+		float slope{ 0 };
+		float intercept{ 0 };
+
+		bool hor_dir{ false };
+		bool ver_dir{ false };
+
+		METEORS(meteors _what, float _sx, float _sy);
+
+		void set_path(float targ_x, float targ_y);
+
+	public:
+		meteors type{ meteors::meteor1 };
+		int lifes{ 0 };
+
+		float angle{ 0 };
+
+		int get_frame();
+		bool move(float gear);
+
+		void Release();
+
+		static METEORS* create(meteors what, float sx, float sy, float ex, float ey, float oppos, float adjanced);
 	};
 
 	// FUNCTIONS **********************************
