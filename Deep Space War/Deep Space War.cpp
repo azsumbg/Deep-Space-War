@@ -132,11 +132,14 @@ ID2D1Bitmap* bmpMeteor3[20]{ nullptr };
 ID2D1Bitmap* bmpHero[6]{ nullptr };
 ID2D1Bitmap* bmpShot[12]{ nullptr };
 
+ID2D1Bitmap* bmpExplosion[24]{ nullptr };
+
 ////////////////////////////////////////////////////////
 
 struct EXPLOSION
 {
 	D2D1_POINT_2F center{};
+	D2D1_RECT_F rect{};
 
 	int frame = 0;
 	int max_frames = 23;
@@ -150,6 +153,8 @@ struct EXPLOSION
 			frame_delay = 4;
 			++frame;
 		}
+
+		return frame;
 	}
 };
 
@@ -241,6 +246,7 @@ void ReleaseResources()
 
 	for (int i = 0; i < 6; ++i)if (!FreeMem(&bmpHero[i]))LogErr(L"Error releasing D2D1 bmpHero !");
 	for (int i = 0; i < 12; ++i)if (!FreeMem(&bmpShot[i]))LogErr(L"Error releasing D2D1 bmpShot !");
+	for (int i = 0; i < 24; ++i)if (!FreeMem(&bmpExplosion[i]))LogErr(L"Error releasing D2D1 bmpExplosion !");
 }
 void ErrExit(int what)
 {
@@ -546,6 +552,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 			vHeroShots.push_back(dll::CREATURES::create(creatures::shot, Hero->center.x, Hero->center.y));
 			vHeroShots.back()->angle = Hero->angle;
+			vHeroShots.back()->strenght = Hero->strenght;
 			vHeroShots.back()->set_path(targ_x, targ_y);
 			if (sound)mciSendString(L"play .\\res\\snd\\laser.wav", NULL, NULL, NULL);
 		}
@@ -850,6 +857,20 @@ void CreateResources()
 					ErrExit(eD2D);
 				}
 			}
+			for (int i = 0; i < 24; ++i)
+			{
+				wchar_t name[100]{ L".\\res\\img\\explosion\\" };
+				wchar_t add[4]{ L"\0" };
+				wsprintf(add, L"%d", i);
+				wcscat_s(name, add);
+				wcscat_s(name, L".png");
+				bmpExplosion[i] = Load(name, Draw);
+				if (!bmpExplosion[i])
+				{
+					LogErr(L"Error loading bmpExplosion !");
+					ErrExit(eD2D);
+				}
+			}
 		}
 
 		hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
@@ -878,14 +899,14 @@ void CreateResources()
 
 	PlaySound(L".\\res\\snd\\intro.wav", NULL, SND_ASYNC);
 
-	for (int i = 0; i < 220; ++i)
+	for (int i = 0; i < 240; ++i)
 	{
 		Draw->BeginDraw();
 		Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
 		Draw->DrawBitmap(bmpLogo, D2D1::RectF(0, 0, scr_width, scr_height));
 		Draw->EndDraw();
 
-		if (i == 219)PlaySound(L".\\res\\snd\\boom.wav", NULL, SND_SYNC);
+		if (i == 239)PlaySound(L".\\res\\snd\\boom.wav", NULL, SND_SYNC);
 	}
 }
 
@@ -947,7 +968,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		if (vMeteors.size() < (int)(level)+3 && RandIt(0, 700) == 66)
+		if (vMeteors.size() < (int)(level)+3 && RandIt(0, 1000) == 66)
 		{
 			float start_x{ RandIt(0.0f, 900.0f) };
 			float start_y{ sky - 100.0f };
@@ -1009,9 +1030,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 			for (std::vector<dll::CREATURES*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
 			{
-				if (!MeteorsBag.empty())dll::sort(MeteorsBag, (*evil)->center);
-				if (!AssetsBag.empty())dll::sort(AssetsBag, (*evil)->center);
-
 				dll::AIMove((*evil), AssetsBag, MeteorsBag, Hero->center);
 			}
 		}
@@ -1030,12 +1048,64 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 						vEvilShots.push_back(dll::CREATURES::create(creatures::shot, vEvils[i]->center.x, vEvils[i]->center.y));
 						vEvilShots.back()->set_path(Hero->center.x, Hero->center.y);
 						vEvilShots.back()->angle = vEvils[i]->angle;
+						vEvilShots.back()->strenght = damage;
 					}
+				}
+			}
+		}
+		if (!vEvilShots.empty())
+		{
+			for (std::vector<dll::CREATURES*>::iterator shot = vEvilShots.begin(); shot < vEvilShots.end(); ++shot)
+			{
+				if (!(*shot)->shot_move(level))
+				{
+					(*shot)->Release();
+					vEvilShots.erase(shot);
+					break;
 				}
 			}
 		}
 
 
+		if (!vMeteors.empty() && !vHeroShots.empty())
+		{
+			bool killed = false;
+
+			for (std::vector<dll::METEORS*>::iterator met = vMeteors.begin(); met < vMeteors.end(); ++met)
+			{
+				for (std::vector<dll::CREATURES*>::iterator shot = vHeroShots.begin(); shot < vHeroShots.end(); ++shot)
+				{
+					if (dll::intersect((*met)->my_rect, (*shot)->my_rect))
+					{
+						(*met)->lifes -= (*shot)->strenght;
+						(*shot)->Release();
+						vHeroShots.erase(shot);
+
+						if ((*met)->lifes <= 0)
+						{
+							score += 50 * (int)level;
+							
+							if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+
+							vExplosions.push_back(EXPLOSION((*met)->center));
+							vExplosions.back().rect.left = vExplosions.back().center.x - 50.0f;
+							vExplosions.back().rect.right = vExplosions.back().center.x + 50.0f;
+							vExplosions.back().rect.top = vExplosions.back().center.y - 57.0f;
+							vExplosions.back().rect.bottom = vExplosions.back().center.y + 57.0f;
+							
+							killed = true;
+
+							(*met)->Release();
+							vMeteors.erase(met);
+						}
+						
+						break;
+					}
+				}
+				
+				if (killed)break;
+			}
+		}
 
 
 	// DRAW THINGS *****************************************************************
@@ -1099,6 +1169,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(Hero->angle, Hero->center));
 			Draw->DrawBitmap(bmpHero[Hero->get_frame()], Hero->my_rect);
+			
+			Draw->DrawLine(D2D1::Point2F(Hero->start.x + 12.0f , Hero->end.y + 5.0f),
+				D2D1::Point2F(Hero->start.x + Hero->lifes / 3, Hero->end.y + 5.0f), backBrush, 5.0f);
+			Draw->DrawLine(D2D1::Point2F(Hero->start.x + 12.0f, Hero->end.y + 5.0f),
+				D2D1::Point2F(Hero->start.x + Hero->lifes / 3, Hero->end.y + 5.0f), lifeBrush, 2.0f);
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, Hero->center));
 		}
 
@@ -1139,6 +1214,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					break;
 				}
 
+				Draw->DrawLine(D2D1::Point2F((*evil)->start.x + 12.0f, (*evil)->end.y + 5.0f),
+					D2D1::Point2F((*evil)->start.x + (float)((*evil)->lifes) / 2.0f, (*evil)->end.y + 5.0f), backBrush, 5.0f);
+				Draw->DrawLine(D2D1::Point2F((*evil)->start.x + 12.0f, (*evil)->end.y + 5.0f),
+					D2D1::Point2F((*evil)->start.x + (float)((*evil)->lifes) / 2.0f, (*evil)->end.y + 5.0f), lifeBrush, 2.0f);
+				
 				Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, (*evil)->center));
 			}
 		}
@@ -1154,6 +1234,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 
 
+		// DRAW EXPLOSIONS *****************************
+
+		if (!vExplosions.empty())
+		{
+			for (int i = 0; i < vExplosions.size(); ++i)
+			{
+				int aframe = vExplosions[i].get_frame();
+				if (aframe > 23)
+				{
+					vExplosions.erase(vExplosions.begin() + i);
+					break;
+				}
+				Draw->DrawBitmap(bmpExplosion[aframe], vExplosions[i].rect);
+			}
+		}
 
 		////////////////////////////////////////////////////////////////////////////////
 		
