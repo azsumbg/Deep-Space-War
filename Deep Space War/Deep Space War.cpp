@@ -74,6 +74,7 @@ bool b2Hglt{ false };
 bool b3Hglt{ false };
 
 bool level_skipped{ false };
+bool game_over = false;
 
 bool name_set{ false };
 
@@ -280,6 +281,7 @@ void InitGame()
 	secs = 0;
 
 	level_skipped = false;
+	game_over = false;
 
 	vExplosions.clear();
 	vAssets.clear();
@@ -968,8 +970,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		if (vMeteors.size() < (int)(level)+3 && RandIt(0, 1000) == 66)
+		if (vMeteors.size() < (int)(level) + 3 && RandIt(0, 1000) == 66)
 		{
+			if (sound)mciSendString(L"play .\\res\\snd\\meteor.wav", NULL, NULL, NULL);
+
 			float start_x{ RandIt(0.0f, 900.0f) };
 			float start_y{ sky - 100.0f };
 
@@ -1015,6 +1019,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			if (vEvils.back()->center.x > scr_width / 2.0f)vEvils.back()->set_path(0, vEvils.back()->center.y);
 			else vEvils.back()->set_path(scr_width, vEvils.back()->center.y);
 			vEvils.back()->action = actions::patrol;
+
+			if (sound)mciSendString(L"play .\\res\\snd\\warp.wav", NULL, NULL, NULL);
 		}
 
 		if (!vEvils.empty() && Hero)
@@ -1066,7 +1072,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-
 		if (!vMeteors.empty() && !vHeroShots.empty())
 		{
 			bool killed = false;
@@ -1106,7 +1111,146 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				if (killed)break;
 			}
 		}
+		if (!vEvils.empty() && !vHeroShots.empty())
+		{
+			bool killed = false;
 
+			for (std::vector<dll::CREATURES*>::iterator met = vEvils.begin(); met < vEvils.end(); ++met)
+			{
+				for (std::vector<dll::CREATURES*>::iterator shot = vHeroShots.begin(); shot < vHeroShots.end(); ++shot)
+				{
+					if (dll::intersect((*met)->my_rect, (*shot)->my_rect))
+					{
+						(*met)->lifes -= (*shot)->strenght;
+						(*shot)->Release();
+						vHeroShots.erase(shot);
+
+						if ((*met)->lifes <= 0)
+						{
+							score += (*met)->strenght * (int)level;
+
+							if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+
+							vExplosions.push_back(EXPLOSION((*met)->center));
+							vExplosions.back().rect.left = vExplosions.back().center.x - 50.0f;
+							vExplosions.back().rect.right = vExplosions.back().center.x + 50.0f;
+							vExplosions.back().rect.top = vExplosions.back().center.y - 57.0f;
+							vExplosions.back().rect.bottom = vExplosions.back().center.y + 57.0f;
+
+							killed = true;
+
+							(*met)->Release();
+							vEvils.erase(met);
+						}
+
+						break;
+					}
+				}
+
+				if (killed)break;
+			}
+		}
+
+		if (!vEvils.empty() && !vMeteors.empty())
+		{
+			bool killed = false;
+
+			for (std::vector<dll::METEORS*>::iterator met = vMeteors.begin(); met < vMeteors.end(); ++met)
+			{
+				for (std::vector<dll::CREATURES*>::iterator shot = vEvils.begin(); shot < vEvils.end(); ++shot)
+				{
+					if (dll::intersect((*met)->my_rect, (*shot)->my_rect))
+					{
+						if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+
+						vExplosions.push_back(EXPLOSION((*shot)->center));
+						vExplosions.back().rect.left = vExplosions.back().center.x - (*shot)->x_rad;
+						vExplosions.back().rect.right = vExplosions.back().center.x + (*shot)->x_rad;
+						vExplosions.back().rect.top = vExplosions.back().center.y - (*shot)->y_rad;
+						vExplosions.back().rect.bottom = vExplosions.back().center.y + (*shot)->y_rad;
+
+						(*shot)->Release();
+						vEvils.erase(shot);
+
+						vExplosions.push_back(EXPLOSION((*met)->center));
+						vExplosions.back().rect.left = vExplosions.back().center.x - 50.0f;
+						vExplosions.back().rect.right = vExplosions.back().center.x + 50.0f;
+						vExplosions.back().rect.top = vExplosions.back().center.y - 57.0f;
+						vExplosions.back().rect.bottom = vExplosions.back().center.y + 57.0f;
+
+						killed = true;
+
+						(*met)->Release();
+						vMeteors.erase(met);
+
+						break;
+					}
+				}
+
+				if (killed)break;
+			}
+		}
+
+		if (!vEvilShots.empty() && Hero)
+		{
+			for (std::vector<dll::CREATURES*>::iterator shot = vEvilShots.begin(); shot < vEvilShots.end(); ++shot)
+			{
+				if (dll::intersect((*shot)->my_rect, Hero->my_rect))
+				{
+					Hero->lifes -= (*shot)->strenght;
+
+					(*shot)->Release();
+					vEvilShots.erase(shot);
+					
+					if (Hero->lifes <= 0)
+					{
+						if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+						game_over = true;
+
+						vExplosions.push_back(EXPLOSION(Hero->center));
+						vExplosions.back().rect.left = vExplosions.back().center.x - Hero->x_rad;
+						vExplosions.back().rect.right = vExplosions.back().center.x + Hero->x_rad;
+						vExplosions.back().rect.top = vExplosions.back().center.y - Hero->y_rad;
+						vExplosions.back().rect.bottom = vExplosions.back().center.y + Hero->y_rad;
+
+						FreeMem(&Hero);
+					}
+					break;
+				}
+
+			}
+		}
+
+		if (!vMeteors.empty() && Hero)
+		{
+			for (std::vector<dll::METEORS*>::iterator met = vMeteors.begin(); met < vMeteors.end(); ++met)
+			{
+				if (dll::intersect((*met)->my_rect, Hero->my_rect))
+				{
+					if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+
+					vExplosions.push_back(EXPLOSION((*met)->center));
+					vExplosions.back().rect.left = vExplosions.back().center.x - 50.0f;
+					vExplosions.back().rect.right = vExplosions.back().center.x + 50.0f;
+					vExplosions.back().rect.top = vExplosions.back().center.y - 57.0f;
+					vExplosions.back().rect.bottom = vExplosions.back().center.y + 57.0f;
+
+					vExplosions.push_back(EXPLOSION(Hero->center));
+					vExplosions.back().rect.left = vExplosions.back().center.x - Hero->x_rad;
+					vExplosions.back().rect.right = vExplosions.back().center.x + Hero->x_rad;
+					vExplosions.back().rect.top = vExplosions.back().center.y - Hero->y_rad;
+					vExplosions.back().rect.bottom = vExplosions.back().center.y + Hero->y_rad;
+
+					(*met)->Release();
+					vMeteors.erase(met);
+
+					FreeMem(&Hero);
+					game_over = true;
+
+					break;
+				}
+			}
+		}
 
 	// DRAW THINGS *****************************************************************
 
@@ -1171,7 +1315,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			Draw->DrawBitmap(bmpHero[Hero->get_frame()], Hero->my_rect);
 			
 			Draw->DrawLine(D2D1::Point2F(Hero->start.x + 12.0f , Hero->end.y + 5.0f),
-				D2D1::Point2F(Hero->start.x + Hero->lifes / 3, Hero->end.y + 5.0f), backBrush, 5.0f);
+				D2D1::Point2F(Hero->start.x + Hero->max_lifes / 3, Hero->end.y + 5.0f), backBrush, 5.0f);
 			Draw->DrawLine(D2D1::Point2F(Hero->start.x + 12.0f, Hero->end.y + 5.0f),
 				D2D1::Point2F(Hero->start.x + Hero->lifes / 3, Hero->end.y + 5.0f), lifeBrush, 2.0f);
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, Hero->center));
@@ -1215,7 +1359,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				}
 
 				Draw->DrawLine(D2D1::Point2F((*evil)->start.x + 12.0f, (*evil)->end.y + 5.0f),
-					D2D1::Point2F((*evil)->start.x + (float)((*evil)->lifes) / 2.0f, (*evil)->end.y + 5.0f), backBrush, 5.0f);
+					D2D1::Point2F((*evil)->start.x + (float)((*evil)->max_lifes) / 2.0f, (*evil)->end.y + 5.0f), backBrush, 5.0f);
 				Draw->DrawLine(D2D1::Point2F((*evil)->start.x + 12.0f, (*evil)->end.y + 5.0f),
 					D2D1::Point2F((*evil)->start.x + (float)((*evil)->lifes) / 2.0f, (*evil)->end.y + 5.0f), lifeBrush, 2.0f);
 				
@@ -1244,6 +1388,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				if (aframe > 23)
 				{
 					vExplosions.erase(vExplosions.begin() + i);
+					if (game_over)GameOver();
 					break;
 				}
 				Draw->DrawBitmap(bmpExplosion[aframe], vExplosions[i].rect);
