@@ -104,6 +104,7 @@ ID2D1RadialGradientBrush* b2BckgBrush{ nullptr };
 ID2D1RadialGradientBrush* b3BckgBrush{ nullptr };
 
 IDWriteFactory* iWriteFactory{ nullptr };
+IDWriteTextFormat* smallText{ nullptr };
 IDWriteTextFormat* nrmText{ nullptr };
 IDWriteTextFormat* midText{ nullptr };
 IDWriteTextFormat* bigText{ nullptr };
@@ -219,6 +220,7 @@ void ReleaseResources()
 	if (!FreeMem(&b3BckgBrush))LogErr(L"Error releasing radial D2D1 b3BckgBrush !");
 
 	if (!FreeMem(&iWriteFactory))LogErr(L"Error releasing D2D1 main WriteFactory !");
+	if (!FreeMem(&smallText))LogErr(L"Error releasing D2D1 smallText !");
 	if (!FreeMem(&nrmText))LogErr(L"Error releasing D2D1 nrmText !");
 	if (!FreeMem(&midText))LogErr(L"Error releasing D2D1 midText !");
 	if (!FreeMem(&bigText))LogErr(L"Error releasing D2D1 bigText !");
@@ -278,7 +280,7 @@ void InitGame()
 	level = 1.0f;
 	score = 0;
 	mins = 0;
-	secs = 0;
+	secs = 180;
 
 	level_skipped = false;
 	game_over = false;
@@ -392,6 +394,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		if (pause)break;
 		--secs;
 		mins = secs / 60;
+
 		break;
 
 	case WM_PAINT:
@@ -886,6 +889,8 @@ void CreateResources()
 		if (iWriteFactory)
 		{
 			hr = iWriteFactory->CreateTextFormat(L"Copperplate Gothic", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_OBLIQUE,
+				DWRITE_FONT_STRETCH_NORMAL, 12.0f, L"", &smallText);
+			hr = iWriteFactory->CreateTextFormat(L"Copperplate Gothic", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_OBLIQUE,
 				DWRITE_FONT_STRETCH_NORMAL, 18.0f, L"", &nrmText);
 			hr = iWriteFactory->CreateTextFormat(L"Copperplate Gothic", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_OBLIQUE,
 				DWRITE_FONT_STRETCH_NORMAL, 32.0f, L"", &midText);
@@ -1007,7 +1012,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-
 		if (vEvils.size() < 3 + (int)(level) && RandIt(0, 300) == 66)
 		{
 			float sx{ scr_width - 100.0f };
@@ -1072,6 +1076,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+	// ATTACKS **********************************************
+
 		if (!vMeteors.empty() && !vHeroShots.empty())
 		{
 			bool killed = false;
@@ -1111,6 +1117,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				if (killed)break;
 			}
 		}
+		
 		if (!vEvils.empty() && !vHeroShots.empty())
 		{
 			bool killed = false;
@@ -1252,6 +1259,38 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		if (!vEvils.empty() && Hero)
+		{
+			for (std::vector<dll::CREATURES*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+			{
+				if (dll::intersect((*evil)->my_rect, Hero->my_rect))
+				{
+					if (sound)mciSendString(L"play .\\res\\snd\\explosion.wav", NULL, NULL, NULL);
+
+					vExplosions.push_back(EXPLOSION((*evil)->center));
+					vExplosions.back().rect.left = vExplosions.back().center.x - (*evil)->x_rad;
+					vExplosions.back().rect.right = vExplosions.back().center.x + (*evil)->x_rad;
+					vExplosions.back().rect.top = vExplosions.back().center.y - (*evil)->y_rad;
+					vExplosions.back().rect.bottom = vExplosions.back().center.y + (*evil)->y_rad;
+
+					(*evil)->Release();
+					vEvils.erase(evil);
+
+					vExplosions.push_back(EXPLOSION(Hero->center));
+					vExplosions.back().rect.left = vExplosions.back().center.x - 50.0f;
+					vExplosions.back().rect.right = vExplosions.back().center.x + 50.0f;
+					vExplosions.back().rect.top = vExplosions.back().center.y - 57.0f;
+					vExplosions.back().rect.bottom = vExplosions.back().center.y + 57.0f;
+
+					game_over = true;
+
+					FreeMem(&Hero);
+
+					break;
+				}
+			}
+		}
+
 	// DRAW THINGS *****************************************************************
 
 		Draw->BeginDraw();
@@ -1318,6 +1357,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				D2D1::Point2F(Hero->start.x + Hero->max_lifes / 3, Hero->end.y + 5.0f), backBrush, 5.0f);
 			Draw->DrawLine(D2D1::Point2F(Hero->start.x + 12.0f, Hero->end.y + 5.0f),
 				D2D1::Point2F(Hero->start.x + Hero->lifes / 3, Hero->end.y + 5.0f), lifeBrush, 2.0f);
+			
+			if (Hero && smallText && lifeBrush)
+			{
+				int size{ 0 };
+				for (int i = 0; i < 16; ++i)
+				{
+					if (current_player[i] != 0)++size;
+					else break;
+				}
+				Draw->DrawTextW(current_player, size, smallText, D2D1::RectF(Hero->start.x - 24.0f, Hero->start.y,
+					Hero->end.x, Hero->end.y), lifeBrush);
+			}
+			
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, Hero->center));
 		}
 
@@ -1395,6 +1447,51 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		// DRAW STATUS *********************************
+		
+		if (nrmText && lifeBrush && Hero)
+		{
+			wchar_t txt[2000]{ L"броня: " };
+			wchar_t add[5]{ L"\0" };
+
+			int size = 0;
+
+			wsprintf(add, L"%d", Hero->armor);
+			wcscat_s(txt, add);
+
+			wcscat_s(txt, L", сила: ");
+			wsprintf(add, L"%d", Hero->strenght);
+			wcscat_s(txt, add);
+
+			wcscat_s(txt, L", ниво: ");
+			wsprintf(add, L"%d", (int)level);
+			wcscat_s(txt, add);
+
+			wcscat_s(txt, L", резултат: ");
+			wsprintf(add, L"%d", score);
+			wcscat_s(txt, add);
+
+			wcscat_s(txt, L", оставащо време: ");
+			if (mins < 10)wcscat_s(txt, L"0");
+			wsprintf(add, L"%d", mins);
+			wcscat_s(txt, add);
+			wcscat_s(txt, L" : ");
+			if (secs - mins * 60 < 10)wcscat_s(txt, L"0");
+			wsprintf(add, L"%d", secs - mins * 60);
+			wcscat_s(txt, add);
+
+			for (int i = 0; i < 200; ++i)
+			{
+				if (txt[i] != '\0')++size;
+				else break;
+			}
+
+			Draw->DrawTextW(txt, size, nrmText, D2D1::RectF(10.0f, ground + 5.0f, scr_width, scr_height), hgltBrush);
+		}
+
+		
+		
+		
 		////////////////////////////////////////////////////////////////////////////////
 		
 		Draw->EndDraw();
