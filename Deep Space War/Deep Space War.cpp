@@ -307,6 +307,52 @@ void InitGame()
 		for (int i = 0; i < vMeteors.size(); ++i)FreeMem(&vMeteors[i]);
 	vMeteors.clear();
 }
+void LevelUp()
+{
+	if (!level_skipped)score += 100 * (int)(level);
+
+	Draw->BeginDraw();
+	Draw->DrawBitmap(bmpLevel, D2D1::RectF(0, 0, scr_width, scr_height));
+	Draw->EndDraw();
+
+	if (sound)
+	{
+		PlaySound(NULL, NULL, NULL);
+		PlaySound(L".\\res\\snd\\levelup.wav", NULL, SND_SYNC);
+		PlaySound(sound_file, NULL, SND_ASYNC | SND_LOOP);
+	}
+	else Sleep(4000);
+
+	++level;
+
+	mins = 0;
+	secs = 180 + 10 * (int)(level);
+
+	level_skipped = false;
+	game_over = false;
+
+	vExplosions.clear();
+	vAssets.clear();
+
+	FreeMem(&Hero);
+	Hero = dll::CREATURES::create(creatures::hero, 100.0f, RandIt(60.0f, ground - 100.0f));
+
+	if (!vHeroShots.empty())
+		for (int i = 0; i < vHeroShots.size(); ++i)FreeMem(&vHeroShots[i]);
+	vHeroShots.clear();
+
+	if (!vEvilShots.empty())
+		for (int i = 0; i < vEvilShots.size(); ++i)FreeMem(&vEvilShots[i]);
+	vEvilShots.clear();
+
+	if (!vEvils.empty())
+		for (int i = 0; i < vEvils.size(); ++i)FreeMem(&vEvils[i]);
+	vEvils.clear();
+
+	if (!vMeteors.empty())
+		for (int i = 0; i < vMeteors.size(); ++i)FreeMem(&vMeteors[i]);
+	vMeteors.clear();
+}
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -394,7 +440,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		if (pause)break;
 		--secs;
 		mins = secs / 60;
-
+		if (secs <= 0)LevelUp();
 		break;
 
 	case WM_PAINT:
@@ -501,7 +547,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				pause = false;
 				break;
 			}
-			GameOver();
+			InitGame();
 			break;
 
 		case mLvl:
@@ -514,7 +560,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				break;
 			}
 			level_skipped = true;
-			InitGame();
+			LevelUp();
 			break;
 
 		case mExit:
@@ -1012,7 +1058,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		if (vEvils.size() < 3 + (int)(level) && RandIt(0, 150) == 66)
+		if (vEvils.size() < 3 + (int)(level) && RandIt(0, 200) == 66)
 		{
 			float sx{ scr_width - 100.0f };
 			float sy{ RandIt(sky, ground - 100.0f) };
