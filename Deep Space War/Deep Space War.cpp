@@ -1075,7 +1075,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				}
 			}
 		}
-
+		
 		if (Hero && !vAssets.empty())
 		{
 			for (std::vector<dll::FADING>::iterator asset = vAssets.begin(); asset < vAssets.end(); ++asset)
@@ -1106,6 +1106,48 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 						}
 					}
 				}
+			}
+		}
+
+		if (!vEvils.empty() && !vAssets.empty())
+		{
+			bool upgraded = false;
+
+			for (std::vector<dll::CREATURES*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+			{
+				for (std::vector<dll::FADING>::iterator asset = vAssets.begin(); asset < vAssets.end(); ++asset)
+				{
+					if (!asset->gathered)
+					{
+						if (dll::intersect(asset->rect, (*evil)->my_rect))
+						{
+							asset->gathered = true;
+
+							upgraded = true;
+
+							switch (asset->type)
+							{
+							case assets::life:
+								if (sound)mciSendString(L"play .\\res\\snd\\life.wav", NULL, NULL, NULL);
+								if ((*evil)->lifes + 50 <= (*evil)->max_lifes)(*evil)->lifes += 50;
+								else (*evil)->lifes = (*evil)->max_lifes;
+								break;
+
+							case assets::armor:
+								if (sound)mciSendString(L"play .\\res\\snd\\upgrade.wav", NULL, NULL, NULL);
+								(*evil)->armor++;
+								break;
+
+							case assets::shot:
+								if (sound)mciSendString(L"play .\\res\\snd\\upgrade.wav", NULL, NULL, NULL);
+								(*evil)->strenght++;
+								break;
+							}
+						}
+					}
+				}
+
+				if (upgraded)break;
 			}
 		}
 
