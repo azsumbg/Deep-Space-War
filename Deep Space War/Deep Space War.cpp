@@ -1012,7 +1012,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		if (vEvils.size() < 3 + (int)(level) && RandIt(0, 300) == 66)
+		if (vEvils.size() < 3 + (int)(level) && RandIt(0, 150) == 66)
 		{
 			float sx{ scr_width - 100.0f };
 			float sy{ RandIt(sky, ground - 100.0f) };
@@ -1044,7 +1044,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		if (!vEvils.empty())
+		if (!vEvils.empty() && Hero)
 		{
 			for (int i = 0; i < vEvils.size(); ++i)
 			{
@@ -1082,27 +1082,29 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			{
 				if (!asset->gathered)
 				{
-					asset->gathered = true;
-
 					if (dll::intersect(asset->rect, Hero->my_rect))
 					{
+						asset->gathered = true;
+
 						switch (asset->type)
 						{
 						case assets::life:
+							if (sound)mciSendString(L"play .\\res\\snd\\life.wav", NULL, NULL, NULL);
 							if (Hero->lifes + 50 <= Hero->max_lifes)Hero->lifes += 50;
 							else Hero->lifes = Hero->max_lifes;
 							break;
 
 						case assets::armor:
+							if (sound)mciSendString(L"play .\\res\\snd\\upgrade.wav", NULL, NULL, NULL);
 							Hero->armor++;
 							break;
 
 						case assets::shot:
+							if (sound)mciSendString(L"play .\\res\\snd\\upgrade.wav", NULL, NULL, NULL);
 							Hero->strenght++;
 							break;
 						}
 					}
-
 				}
 			}
 		}
@@ -1559,7 +1561,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				{
 					float curr_opacity{ asset->get_opacity() };
 
-					if (curr_opacity <= 0)vAssets.erase(asset);
+					if (curr_opacity <= 0)
+					{
+						vAssets.erase(asset);
+						break;
+					}
 					else
 					{
 						switch (asset->type)
