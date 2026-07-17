@@ -1076,6 +1076,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		if (Hero && !vAssets.empty())
+		{
+			for (std::vector<dll::FADING>::iterator asset = vAssets.begin(); asset < vAssets.end(); ++asset)
+			{
+				if (!asset->gathered)
+				{
+					asset->gathered = true;
+
+					if (dll::intersect(asset->rect, Hero->my_rect))
+					{
+						switch (asset->type)
+						{
+						case assets::life:
+							if (Hero->lifes + 50 <= Hero->max_lifes)Hero->lifes += 50;
+							else Hero->lifes = Hero->max_lifes;
+							break;
+
+						case assets::armor:
+							Hero->armor++;
+							break;
+
+						case assets::shot:
+							Hero->strenght++;
+							break;
+						}
+					}
+
+				}
+			}
+		}
+
 	// ATTACKS **********************************************
 
 		if (!vMeteors.empty() && !vHeroShots.empty())
@@ -1128,7 +1159,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				{
 					if (dll::intersect((*met)->my_rect, (*shot)->my_rect))
 					{
-						(*met)->lifes -= (*shot)->strenght;
+						(*met)->lifes -= ((*shot)->strenght - (*met)->armor);
 						(*shot)->Release();
 						vHeroShots.erase(shot);
 
@@ -1145,6 +1176,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 							vExplosions.back().rect.bottom = vExplosions.back().center.y + 57.0f;
 
 							killed = true;
+
+							if (RandIt(0, 5) == 3)
+							{
+								dll::FADING dummy{};
+								dummy.type = static_cast<assets>(RandIt(0, 2));
+								dummy.rect = D2D1::RectF((*met)->center.x - 11.0f, (*met)->center.y - 15.5f,
+									(*met)->center.x + 11.0f, (*met)->center.y + 15.5f);
+								vAssets.push_back(dummy);
+							}
 
 							(*met)->Release();
 							vEvils.erase(met);
@@ -1204,7 +1244,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			{
 				if (dll::intersect((*shot)->my_rect, Hero->my_rect))
 				{
-					Hero->lifes -= (*shot)->strenght;
+					Hero->lifes -= ((*shot)->strenght - Hero->armor);
 
 					(*shot)->Release();
 					vEvilShots.erase(shot);
@@ -1297,7 +1337,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		
 		Draw->DrawBitmap(bmpSpace[Field.frame()], Field.my_rect);
 
-		// DRAW METEORS *********************************
+		// DRAW METEORS && ASSETS *********************************
 
 		if (!vMeteors.empty())
 		{
@@ -1319,6 +1359,51 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					break;
 				}
 				Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0, (*met)->center));
+			}
+		}
+
+		if (!vAssets.empty())
+		{
+			for (int i = 0; i < vAssets.size(); ++i)
+			{
+				if (!vAssets[i].gathered)
+				{
+					switch (vAssets[i].type)
+					{
+					case assets::armor:
+						Draw->DrawBitmap(bmpAssetArmor, vAssets[i].rect);
+						break;
+
+					case assets::life:
+						Draw->DrawBitmap(bmpAssetLife, vAssets[i].rect);
+						break;
+
+					case assets::shot:
+						Draw->DrawBitmap(bmpAssetShot, vAssets[i].rect);
+						break;
+					}
+				}
+				else
+				{
+					float curr_opacity{ vAssets[i].get_opacity() };
+					
+					switch (vAssets[i].type)
+					{
+					case assets::armor:
+						Draw->DrawBitmap(bmpAssetArmor, vAssets[i].rect, curr_opacity);
+						break;
+
+					case assets::life:
+						Draw->DrawBitmap(bmpAssetLife, vAssets[i].rect, curr_opacity);
+						break;
+
+					case assets::shot:
+						Draw->DrawBitmap(bmpAssetShot, vAssets[i].rect, curr_opacity);
+						break;
+					}
+
+					if (curr_opacity <= 0)vAssets.erase(vAssets.begin() + i);
+				}
 			}
 		}
 
@@ -1447,6 +1532,56 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		// DRAW ASSETS ********************************
+
+		if (!vAssets.empty())
+		{
+			for (std::vector<dll::FADING>::iterator asset = vAssets.begin(); asset < vAssets.end(); ++asset)
+			{
+				if (!asset->gathered)
+				{
+					switch (asset->type)
+					{
+					case assets::armor:
+						Draw->DrawBitmap(bmpAssetArmor, asset->rect);
+						break;
+
+					case assets::life:
+						Draw->DrawBitmap(bmpAssetLife, asset->rect);
+						break;
+
+					case assets::shot:
+						Draw->DrawBitmap(bmpAssetShot, asset->rect);
+						break;
+					}
+				}
+				else
+				{
+					float curr_opacity{ asset->get_opacity() };
+
+					if (curr_opacity <= 0)vAssets.erase(asset);
+					else
+					{
+						switch (asset->type)
+						{
+						case assets::armor:
+							Draw->DrawBitmap(bmpAssetArmor, asset->rect, curr_opacity);
+							break;
+
+						case assets::life:
+							Draw->DrawBitmap(bmpAssetLife, asset->rect, curr_opacity);
+							break;
+
+						case assets::shot:
+							Draw->DrawBitmap(bmpAssetShot, asset->rect, curr_opacity);
+							break;
+						}
+					}
+				}
+			}
+		}
+		
+		
 		// DRAW STATUS *********************************
 		
 		if (nrmText && lifeBrush && Hero)
