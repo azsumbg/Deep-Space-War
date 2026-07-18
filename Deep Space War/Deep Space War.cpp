@@ -450,6 +450,8 @@ void HallOfFame()
 	if (sound)mciSendString(L"play .\\res\\snd\\showrec.wav", NULL, NULL, NULL);
 	Draw->BeginDraw();
 	Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
+	if (bigText && txtBrush)
+		Draw->DrawTextW(txt, result, bigText, D2D1::RectF(100.0f, 150.0f, scr_width, scr_height), txtBrush);
 	Draw->EndDraw();
 
 	Sleep(4000);
@@ -614,6 +616,10 @@ void LoadGame()
 			vEvils.back()->strenght = tstrenght;
 			vEvils.back()->lifes = tlifes;
 			vEvils.back()->armor = tarmor;
+
+			if (vEvils.back()->center.x > scr_width / 2.0f)vEvils.back()->set_path(0, vEvils.back()->center.y);
+			else vEvils.back()->set_path(scr_width, vEvils.back()->center.y);
+			vEvils.back()->action = actions::patrol;
 		}
 	}
 
@@ -893,6 +899,11 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		{
 			if (cur_pos.x * scale_x >= b1Rect.left && cur_pos.x * scale_x <= b1Rect.right)
 			{
+				if (name_set)
+				{
+					if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+					break;
+				}
 				if (sound)mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
 				if (DialogBox(bIns, MAKEINTRESOURCE(IDD_PLAYER), hwnd, &DlgProc) == IDOK)name_set = true;
 				break;
@@ -1894,7 +1905,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					if (current_player[i] != 0)++size;
 					else break;
 				}
-				Draw->DrawTextW(current_player, size, smallText, D2D1::RectF(Hero->start.x - 24.0f, Hero->start.y,
+				Draw->DrawTextW(current_player, size, smallText, D2D1::RectF(Hero->start.x - 36.0f, Hero->start.y,
 					Hero->end.x, Hero->end.y), lifeBrush);
 			}
 			
