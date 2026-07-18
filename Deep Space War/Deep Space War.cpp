@@ -268,7 +268,7 @@ BOOL CheckRecord()
 	if (result == FILE_NOT_EXIST)
 	{
 		std::wofstream rec{ record_file };
-		rec << score;
+		rec << score << std::endl;
 		for (int i = 0; i < 16; ++i)rec << static_cast<int>(current_player[i]) << std::endl;
 		rec.close();
 		return first_record;
@@ -438,20 +438,20 @@ void HallOfFame()
 	result = 0;
 
 	wcscat_s(txt, saved_name);
-	wcscat_s(txt, L"\n\n");
+	wcscat_s(txt, L"\n\nСВЕТОВЕН РЕКОРД: ");
 	wcscat_s(txt, saved_score);
 
 	for (int i = 0; i < 150; ++i)
 	{
-		if (txt[i] != '\0')++score;
+		if (txt[i] != '\0')++result;
 		else break;
 	}
 
 	if (sound)mciSendString(L"play .\\res\\snd\\showrec.wav", NULL, NULL, NULL);
 	Draw->BeginDraw();
 	Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
-	if (bigText && txtBrush)
-		Draw->DrawTextW(txt, result, bigText, D2D1::RectF(100.0f, 150.0f, scr_width, scr_height), txtBrush);
+	if (bigText && hgltBrush)
+		Draw->DrawTextW(txt, result, bigText, D2D1::RectF(50.0f, 100.0f, scr_width, scr_height), hgltBrush);
 	Draw->EndDraw();
 
 	Sleep(4000);
