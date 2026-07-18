@@ -36,7 +36,7 @@ namespace dll
 	{
 	private:
 		float opacity{ 1.0f };
-		int delay = 80;
+		int delay = 20;
 
 	public:
 		assets type{ assets::armor };
@@ -49,7 +49,7 @@ namespace dll
 			--delay;
 			if (delay <= 0)
 			{
-				delay = 80;
+				delay = 20;
 				opacity -= 0.1f;
 			}
 

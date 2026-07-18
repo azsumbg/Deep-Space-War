@@ -9,7 +9,6 @@
 #include "gifresizer.h"
 #include "spacefight.h"
 #include <chrono>
-#include <clocale>
 
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "d2d1.lib")
@@ -260,14 +259,70 @@ void ErrExit(int what)
 	ReleaseResources();
 	exit(1);
 }
+BOOL CheckRecord()
+{
+	if (score < 1)return no_record;
 
+	int result{ 0 };
+	CheckFile(record_file, &result);
+	if (result == FILE_NOT_EXIST)
+	{
+		std::wofstream rec{ record_file };
+		rec << score;
+		for (int i = 0; i < 16; ++i)rec << static_cast<int>(current_player[i]) << std::endl;
+		rec.close();
+		return first_record;
+	}
+	else
+	{
+		std::wifstream check(record_file);
+		check >> result;
+		check.close();
+	}
+
+	if (score > result)
+	{
+		std::wofstream rec{ record_file };
+		rec << score;
+		for (int i = 0; i < 16; ++i)rec << static_cast<int>(current_player[i]) << std::endl;
+		rec.close();
+		return record;
+	}
+
+	return no_record;
+}
 void GameOver()
 {
 	KillTimer(bHwnd, bTimer);
 
 	PlaySound(NULL, NULL, NULL);
 
+	switch (CheckRecord())
+	{
+	case no_record:
+		Draw->BeginDraw();
+		Draw->DrawBitmap(bmpLoose, D2D1::RectF(0, 0, scr_width, scr_height));
+		Draw->EndDraw();
+		if (sound)PlaySound(L".\\res\\snd\\loose.wav", NULL, SND_SYNC);
+		else Sleep(4000);
+		break;
 
+	case first_record:
+		Draw->BeginDraw();
+		Draw->DrawBitmap(bmpWin, D2D1::RectF(0, 0, scr_width, scr_height));
+		Draw->EndDraw();
+		if (sound)PlaySound(L".\\res\\snd\\win.wav", NULL, SND_SYNC);
+		else Sleep(4000);
+		break;
+
+	case record:
+		Draw->BeginDraw();
+		Draw->DrawBitmap(bmpWorldRecord, D2D1::RectF(0, 0, scr_width, scr_height));
+		Draw->EndDraw();
+		if (sound)PlaySound(L".\\res\\snd\\record.wav", NULL, SND_SYNC);
+		else Sleep(4000);
+		break;
+	}
 
 	bMsg.message = WM_QUIT;
 	bMsg.wParam = 0;
@@ -965,8 +1020,6 @@ void CreateResources()
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
-	_wsetlocale(LC_ALL, L"");
-
 	bIns = hInstance;
 	if (!bIns)
 	{
@@ -1249,6 +1302,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				{
 					if (dll::intersect((*met)->my_rect, (*shot)->my_rect))
 					{
+						if (sound)mciSendString(L"play .\\res\\snd\\evildamage.wav", NULL, NULL, NULL);
+
 						(*met)->lifes -= ((*shot)->strenght - (*met)->armor);
 						(*shot)->Release();
 						vHeroShots.erase(shot);
@@ -1334,6 +1389,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			{
 				if (dll::intersect((*shot)->my_rect, Hero->my_rect))
 				{
+					if (sound)mciSendString(L"play .\\res\\snd\\damage.wav", NULL, NULL, NULL);
+
 					Hero->lifes -= ((*shot)->strenght - Hero->armor);
 
 					(*shot)->Release();
@@ -1604,7 +1661,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-
 		// DRAW EXPLOSIONS *****************************
 
 		if (!vExplosions.empty())
@@ -1718,9 +1774,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			Draw->DrawTextW(txt, size, nrmText, D2D1::RectF(10.0f, ground + 5.0f, scr_width, scr_height), hgltBrush);
 		}
 
-		
-		
-		
 		////////////////////////////////////////////////////////////////////////////////
 		
 		Draw->EndDraw();
