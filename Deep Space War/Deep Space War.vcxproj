@@ -150,7 +150,10 @@
     <ClCompile Include="Deep Space War.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="Deep Space War.rc" />
+    <ResourceCompile Include="Deep Space War.rc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\main.ico" />

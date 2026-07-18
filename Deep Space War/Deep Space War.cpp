@@ -1,4 +1,4 @@
-#include "framework.h"
+﻿#include "framework.h"
 #include "Deep Space War.h"
 #include <mmsystem.h>
 #include <d2d1.h>
@@ -408,6 +408,252 @@ void LevelUp()
 		for (int i = 0; i < vMeteors.size(); ++i)FreeMem(&vMeteors[i]);
 	vMeteors.clear();
 }
+void HallOfFame()
+{
+	int result{ 0 };
+	CheckFile(record_file, &result);
+	if (result == FILE_NOT_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+		MessageBox(bHwnd, L"Все още няма рекорд на играта !\n\n Постарай се повече !", L"Липсва файл", MB_OK | MB_APPLMODAL |
+			MB_ICONERROR);
+		return;
+	}
+
+	std::wifstream rec{ record_file };
+	wchar_t txt[150]{ L"НАЙ-ГОЛЯМ ГЕРОЙ: " };
+	wchar_t saved_name[16]{ L"\0" };
+	wchar_t saved_score[5]{ L"\0" };
+
+	rec >> result;
+	wsprintf(saved_score, L"%d", result);
+	for (int i = 0; i < 16; ++i)
+	{
+		int letter{ 0 };
+		rec >> letter;
+		saved_name[i] = static_cast<wchar_t>(letter);
+	}
+	rec.close();
+
+	result = 0;
+
+	wcscat_s(txt, saved_name);
+	wcscat_s(txt, L"\n\n");
+	wcscat_s(txt, saved_score);
+
+	for (int i = 0; i < 150; ++i)
+	{
+		if (txt[i] != '\0')++score;
+		else break;
+	}
+
+	if (sound)mciSendString(L"play .\\res\\snd\\showrec.wav", NULL, NULL, NULL);
+	Draw->BeginDraw();
+	Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
+	Draw->EndDraw();
+
+	Sleep(4000);
+
+}
+void SaveGame()
+{
+	int result{ 0 };
+	CheckFile(save_file, &result);
+	if (result == FILE_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+		if (MessageBox(bHwnd, L"Има предишна записана игра, която ще презапишеш !\n\nНаистина ли я презаписваш ?",
+			L"Презапис", MB_YESNO | MB_APPLMODAL | MB_ICONINFORMATION) == IDNO)return;
+	}
+
+	std::wofstream save{ save_file };
+
+	save << level << std::endl;
+	save << score << std::endl;
+	save << mins << std::endl;
+	save << secs << std::endl;
+
+	save << level_skipped << std::endl;
+	
+	if (game_over)
+	{
+		save.close();
+		std::remove(".\\res\\data\\save.dat");
+		GameOver();
+	}
+
+	for (int i = 0; i < 16; ++i)save << static_cast<int>(current_player[i]) << std::endl;
+	save << name_set << std::endl;
+
+	save << Hero->start.x << std::endl;
+	save << Hero->start.y << std::endl;
+	save << Hero->lifes << std::endl;
+	save << Hero->strenght << std::endl;
+	save << Hero->armor << std::endl;
+
+	save << vEvils.size() << std::endl;
+	if (!vEvils.empty())
+	{
+		for (std::vector<dll::CREATURES*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+		{
+			save << static_cast<int>((*evil)->type) << std::endl;
+			save << (*evil)->start.x << std::endl;
+			save << (*evil)->start.y << std::endl;
+			save << (*evil)->lifes << std::endl;
+			save << (*evil)->strenght << std::endl;
+			save << (*evil)->armor << std::endl;
+		}
+	}
+
+	save << vMeteors.size() << std::endl;
+	if (!vMeteors.empty())
+	{
+		for (std::vector<dll::METEORS*>::iterator met = vMeteors.begin(); met < vMeteors.end(); ++met)
+		{
+			save << static_cast<int>((*met)->type) << std::endl;
+			save << (*met)->start.x << std::endl;
+			save << (*met)->start.y << std::endl;
+			save << (*met)->lifes << std::endl;
+		}
+	}
+
+	save.close();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
+
+	MessageBox(bHwnd, L"Играта е запазена !", L"Запис", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+}
+void LoadGame()
+{
+	int result{ 0 };
+	CheckFile(record_file, &result);
+	if (result == FILE_NOT_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+		MessageBox(bHwnd, L"Все още няма записана игра !\n\n Постарай се повече !", L"Липсва файл", MB_OK | MB_APPLMODAL |
+			MB_ICONERROR);
+		return;
+	}
+	else
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+		if (MessageBox(bHwnd, L"Сегашната игра ще бъде презаписана !\n\nНаистина ли я презаписваш ?",
+			L"Презапис", MB_YESNO | MB_APPLMODAL | MB_ICONINFORMATION) == IDNO)return;
+	}
+
+	vExplosions.clear();
+	vAssets.clear();
+
+	FreeMem(&Hero);
+
+	if (!vHeroShots.empty())
+		for (int i = 0; i < vHeroShots.size(); ++i)FreeMem(&vHeroShots[i]);
+	vHeroShots.clear();
+
+	if (!vEvilShots.empty())
+		for (int i = 0; i < vEvilShots.size(); ++i)FreeMem(&vEvilShots[i]);
+	vEvilShots.clear();
+
+	if (!vEvils.empty())
+		for (int i = 0; i < vEvils.size(); ++i)FreeMem(&vEvils[i]);
+	vEvils.clear();
+
+	if (!vMeteors.empty())
+		for (int i = 0; i < vMeteors.size(); ++i)FreeMem(&vMeteors[i]);
+	vMeteors.clear();
+
+	std::wifstream save{ save_file };
+
+	save >> level;
+	save >> score;
+	save >> mins;
+	save >> secs;
+
+	save >> level_skipped;
+
+	for (int i = 0; i < 16; ++i)
+	{
+		int letter{ 0 };
+		save >> letter;
+		current_player[i] = static_cast<wchar_t>(letter);
+	}
+	save >> name_set;
+
+	float sx{ 0 };
+	float sy{ 0 };
+	int tlifes{ 0 };
+	int tstrenght{ 0 };
+	int tarmor{ 0 };
+
+	save >> sx;
+	save >> sy;
+	save >> tlifes;
+	save >> tstrenght;
+	save >> tarmor;
+
+	Hero = dll::CREATURES::create(creatures::hero, sx, sy);
+	Hero->lifes = tlifes;
+	Hero->armor = tarmor;
+	Hero->strenght = tstrenght;
+
+	save >> result;
+	if (result > 0)
+	{
+		for (int i = 0; i < result; ++i)
+		{
+			int ttype{ -1 };
+
+			save >> ttype;
+			save >> sx;
+			save >> sy;
+			save >> tlifes;
+			save >> tstrenght;
+			save >> tarmor;
+			
+			vEvils.push_back(dll::CREATURES::create(static_cast<creatures>(ttype), sx, sy));
+			vEvils.back()->strenght = tstrenght;
+			vEvils.back()->lifes = tlifes;
+			vEvils.back()->armor = tarmor;
+		}
+	}
+
+	save >> result;
+	if (result > 0)
+	{
+		for (int i = 0; i < result; ++i)
+		{
+			int ttype{ -1 };
+			
+			save >> ttype;
+			save >> sx;
+			save >> sy;
+			save >> tlifes;
+
+			float end_x{ 0 };
+			float end_y{ ground + 200.0f };
+
+			float opposite{ 0 };
+			float adjanced{ 0 };
+
+			if (sx < scr_width / 2.0f)end_x = scr_width / 2.0f + RandIt(50.0f, scr_width);
+			else end_x = scr_width / 2.0f - RandIt(50.0f, 400.0f);
+
+			if (RandIt(0, 2) == 1)sy = ground + 100.0f;
+
+			opposite = abs(sx - end_x);
+			adjanced = abs(sy - end_y);
+
+			vMeteors.push_back(dll::METEORS::create(static_cast<meteors>(ttype), sx, sy, end_x, end_y, opposite, adjanced));
+			vMeteors.back()->lifes = tlifes;
+		}
+	}
+
+	save.close();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
+
+	MessageBox(bHwnd, L"Играта е заредена !", L"Заредена", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+}
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -471,7 +717,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			AppendMenu(bStore, MF_STRING, mSave, L"Запази игра");
 			AppendMenu(bStore, MF_STRING, mLoad, L"Зареди игра");
 			AppendMenu(bStore, MF_SEPARATOR, NULL, NULL);
-			AppendMenu(bStore, MF_STRING, mHoF, L"Зьль на славата");
+			AppendMenu(bStore, MF_STRING, mHoF, L"Зала на славата");
 
 			SetMenu(hwnd, bBar);
 
@@ -622,13 +868,56 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			SendMessage(hwnd, WM_CLOSE, NULL, NULL);
 			break;
 
+		case mSave:
+			pause = true;
+			SaveGame();
+			pause = false;
+			break;
+
+		case mLoad:
+			pause = true;
+			LoadGame();
+			pause = false;
+			break;
+
+		case mHoF:
+			pause = true;
+			HallOfFame();
+			pause = false;
+			break;
 		}
 		break;
 
 	case WM_LBUTTONDOWN:
 		if (HIWORD(lParam) <= 50)
 		{
+			if (cur_pos.x * scale_x >= b1Rect.left && cur_pos.x * scale_x <= b1Rect.right)
+			{
+				if (sound)mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
+				if (DialogBox(bIns, MAKEINTRESOURCE(IDD_PLAYER), hwnd, &DlgProc) == IDOK)name_set = true;
+				break;
+			}
+			else if (cur_pos.x * scale_x >= b2Rect.left && cur_pos.x * scale_x <= b2Rect.right)
+			{
+				mciSendString(L"play .\\res\\snd\\select.wav", NULL, NULL, NULL);
+				
+				if (sound)
+				{
+					PlaySound(NULL, NULL, NULL);
+					sound = false;
+					break;
+				}
+				else
+				{
+					PlaySound(sound_file, NULL, SND_ASYNC | SND_LOOP);
+					sound = true;
+					break;
+				}
+			}
+			else if (cur_pos.x * scale_x >= b3Rect.left && cur_pos.x * scale_x <= b3Rect.right)
+			{
 
+			}
 		}
 		else
 		{
@@ -1117,8 +1406,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			float sy{ RandIt(sky, ground - 100.0f) };
 
 			if (RandIt(0, 2) == 2)sx = 100.0f;
+			
+			dll::CREATURES* dummy{ dll::CREATURES::create(static_cast<creatures>(RandIt(0, 3)), sx, sy) };
+
+			if (Hero)
+			{
+				if (dll::intersect(Hero->my_rect, dummy->my_rect))continue;
+			}
 	
-			vEvils.push_back(dll::CREATURES::create(static_cast<creatures>(RandIt(0, 3)), sx, sy));
+			vEvils.push_back(dummy);
 			if (vEvils.back()->center.x > scr_width / 2.0f)vEvils.back()->set_path(0, vEvils.back()->center.y);
 			else vEvils.back()->set_path(scr_width, vEvils.back()->center.y);
 			vEvils.back()->action = actions::patrol;
