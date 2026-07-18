@@ -1668,13 +1668,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			for (int i = 0; i < vExplosions.size(); ++i)
 			{
 				int aframe = vExplosions[i].get_frame();
-				if (aframe > 23)
+				if (aframe <= 23)Draw->DrawBitmap(bmpExplosion[aframe], vExplosions[i].rect);
+				else
 				{
 					vExplosions.erase(vExplosions.begin() + i);
-					if (game_over)GameOver();
+					if (game_over)
+					{
+						Draw->EndDraw();
+						GameOver();
+					}
 					break;
 				}
-				Draw->DrawBitmap(bmpExplosion[aframe], vExplosions[i].rect);
 			}
 		}
 
