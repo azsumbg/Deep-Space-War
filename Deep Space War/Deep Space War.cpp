@@ -415,7 +415,7 @@ void HallOfFame()
 	if (result == FILE_NOT_EXIST)
 	{
 		if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
-		MessageBox(bHwnd, L"Все още няма рекорд на играта !\n\n Постарай се повече !", L"Липсва файл", MB_OK | MB_APPLMODAL |
+		MessageBox(bHwnd, L"Все още няма рекорд на играта !\n\nПостарай се повече !", L"Липсва файл", MB_OK | MB_APPLMODAL |
 			MB_ICONERROR);
 		return;
 	}
@@ -532,7 +532,7 @@ void LoadGame()
 	if (result == FILE_NOT_EXIST)
 	{
 		if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
-		MessageBox(bHwnd, L"Все още няма записана игра !\n\n Постарай се повече !", L"Липсва файл", MB_OK | MB_APPLMODAL |
+		MessageBox(bHwnd, L"Все още няма записана игра !\n\nПостарай се повече !", L"Липсва файл", MB_OK | MB_APPLMODAL |
 			MB_ICONERROR);
 		return;
 	}
@@ -659,6 +659,59 @@ void LoadGame()
 	if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
 
 	MessageBox(bHwnd, L"Играта е заредена !", L"Заредена", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+}
+void ShowHelp()
+{
+	int result{ 0 };
+	CheckFile(help_file, &result);
+	if (result == FILE_NOT_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+		MessageBox(bHwnd, L"Липсва помощна информация за играта !\n\nСвържете се с разработчика !", L"Липсва файл", MB_OK | MB_APPLMODAL |
+			MB_ICONERROR);
+		return;
+	}
+	
+	std::wifstream help{ help_file };
+
+	wchar_t data[1000]{ L"\0" };
+
+	help >> result;
+
+	for (int i = 0; i < result; ++i)
+	{
+		int letter = 0;
+		help >> letter;
+		data[i] = static_cast<wchar_t>(letter);
+	}
+
+	help.close();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\showhelp.wav", NULL, NULL, NULL);
+
+	Draw->BeginDraw();
+	Draw->DrawBitmap(bmpIntro[Intro.frame()], D2D1::RectF(0, 0, scr_width, scr_height));
+	if (statBrush && inactBrush && txtBrush && hgltBrush && nrmText && b1BckgBrush && b2BckgBrush && b3BckgBrush)
+	{
+		Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), statBrush);
+		Draw->FillRoundedRectangle(D2D1::RoundedRect(b1Rect, 25.0f, 30.0f), b1BckgBrush);
+		Draw->FillRoundedRectangle(D2D1::RoundedRect(b2Rect, 25.0f, 30.0f), b2BckgBrush);
+		Draw->FillRoundedRectangle(D2D1::RoundedRect(b3Rect, 25.0f, 30.0f), b3BckgBrush);
+
+		if (name_set)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmText, b1TxtRect, inactBrush);
+		else
+		{
+			if (!b1Hglt)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmText, b1TxtRect, txtBrush);
+			else Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmText, b1TxtRect, hgltBrush);
+		}
+		if (!b2Hglt)Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmText, b2TxtRect, txtBrush);
+		else Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmText, b2TxtRect, hgltBrush);
+		if (!b3Hglt)Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmText, b3TxtRect, txtBrush);
+		else Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmText, b3TxtRect, hgltBrush);
+
+		if (midText)Draw->DrawTextW(data, result, midText, D2D1::RectF(50.0f, 100.0f, scr_width, scr_height), hgltBrush);
+	}
+	Draw->EndDraw();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -927,7 +980,19 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			}
 			else if (cur_pos.x * scale_x >= b3Rect.left && cur_pos.x * scale_x <= b3Rect.right)
 			{
-
+				if (!show_help)
+				{
+					pause = true;
+					show_help = true;
+					ShowHelp();
+					break;
+				}
+				else
+				{
+					pause = false;
+					show_help = false;
+					break;
+				}
 			}
 		}
 		else
@@ -1294,7 +1359,7 @@ void CreateResources()
 			hr = iWriteFactory->CreateTextFormat(L"Copperplate Gothic", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_OBLIQUE,
 				DWRITE_FONT_STRETCH_NORMAL, 18.0f, L"", &nrmText);
 			hr = iWriteFactory->CreateTextFormat(L"Copperplate Gothic", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_OBLIQUE,
-				DWRITE_FONT_STRETCH_NORMAL, 32.0f, L"", &midText);
+				DWRITE_FONT_STRETCH_NORMAL, 28.0f, L"", &midText);
 			hr = iWriteFactory->CreateTextFormat(L"Copperplate Gothic", nullptr, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_OBLIQUE,
 				DWRITE_FONT_STRETCH_NORMAL, 72.0f, L"", &bigText);
 			if (hr != S_OK)
