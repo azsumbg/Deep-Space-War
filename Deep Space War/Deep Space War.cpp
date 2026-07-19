@@ -176,7 +176,6 @@ std::vector<dll::CREATURES*> vEvils{ nullptr };
 
 std::vector<dll::METEORS*> vMeteors{ nullptr };
 
-
 ///////////////////////////////////////////////////////
 
 template<typename T>concept HasRelease = requires(T check)
@@ -1393,6 +1392,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	}
 
 	CreateResources();
+
+	PlaySound(sound_file, NULL, SND_ASYNC | SND_LOOP);
 
 	while (bMsg.message != WM_QUIT)
 	{
